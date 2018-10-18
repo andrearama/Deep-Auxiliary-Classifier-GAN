@@ -8,7 +8,7 @@ Created on Wed Oct 10 15:15:51 2018
 from __future__ import print_function, division
 
 from utils import load_dataset
-from keras.layers import Input, Dense, Reshape, Flatten, Dropout, multiply
+from keras.layers import Input, Dense, Reshape, Flatten, Dropout, multiply, concatenate
 from keras.layers import BatchNormalization, Activation, Embedding, ZeroPadding2D
 from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.convolutional import UpSampling2D, Conv2D
@@ -46,7 +46,9 @@ class Acgan():
         # and generates the corresponding digit of that label
         noise = Input(shape=(self.latent_dim,))
         label = Input(shape=(1,))
-        img = self.generator([noise, label])
+        label_tensor = Input(shape=(self.img_size/2, self.img_size/2, 
+                                    self.num_classes), dtype='float32')
+        img = self.generator([noise, label, label_tensor])
 
         # For the combined model we will only train the generator
         self.discriminator.trainable = False
@@ -57,38 +59,50 @@ class Acgan():
 
         # The combined model  (stacked generator and discriminator)
         # Trains the generator to fool the discriminator
-        self.combined = Model([noise, label], [valid, target_label])
+        self.combined = Model([noise, label, label_tensor], [valid, target_label])
         self.combined.compile(loss=losses,
             optimizer=optimizer)
 
     def build_generator(self):
-        d1 = int(self.img_size / 4)
+        d1 = int(self.img_size / 8)
         
         model = Sequential()        
-        model.add(Dense(128 * d1 * d1, activation="relu", input_dim=self.latent_dim))
-        model.add(Reshape((d1, d1, 128)))
+        model.add(Dense(256 * d1 * d1, activation="relu", input_dim=self.latent_dim))
+        model.add(Reshape((d1, d1, 256)))                               #size:(d1,d1,256)
         model.add(BatchNormalization(momentum=0.8))
-        model.add(UpSampling2D())
-        model.add(Conv2D(128, kernel_size=3, padding="same"))
-        model.add(Activation("relu"))
+        model.add(UpSampling2D())                                       #size: (2*d1,2*d1,256)
+        model.add(Conv2D(256, kernel_size=3, padding="same"))
+        model.add(Activation("relu"))                           
         model.add(BatchNormalization(momentum=0.8))
-        model.add(UpSampling2D())
-        model.add(Conv2D(64, kernel_size=3, padding="same"))
-        model.add(Activation("relu"))
-        model.add(BatchNormalization(momentum=0.8))
-        model.add(Conv2D(self.channels, kernel_size=3, padding='same'))
-        model.add(Activation("tanh"))
+        model.add(UpSampling2D())                                       #size: (4*d1,4*d1,256)
 
-        model.summary()
+                      
+        model2 = Sequential()                                           #size: (4*d1,4*d1,256+num_classes)
+        model2.add(Conv2D(128, kernel_size=3, padding="same",           #size: (4*d1,4*d1,128)
+                          input_shape=(4*d1, 4*d1, 256+self.num_classes) ))           
+        model2.add(Activation("relu"))                            
+        model2.add(BatchNormalization(momentum=0.8))
+        model2.add(UpSampling2D())                                       #size: (img_size,img_size,128)
+        model2.add(Conv2D(64, kernel_size=3, padding="same"))            #size: (img_size,img_size,64)
+        model2.add(Activation("relu"))
+        model2.add(BatchNormalization(momentum=0.8))
+        model2.add(Conv2D(self.channels, kernel_size=3, padding='same')) #size: (img_size,img_size,3)
+        model2.add(Activation("tanh"))
+
+        model2.summary()
 
         noise = Input(shape=(self.latent_dim,))
         label = Input(shape=(1,), dtype='int32')
+        label_tensor = Input(shape=(4*d1,4*d1,self.num_classes), dtype='float32')
+
         label_embedding = Flatten()(Embedding(self.num_classes, 100)(label))
-
         model_input = multiply([noise, label_embedding])
-        img = model(model_input)
+        r = model(model_input)
+        merged = concatenate([r, label_tensor])        
 
-        return Model([noise, label], img)
+        img = model2(merged)
+
+        return Model([noise, label,label_tensor], img)
 
     def build_discriminator(self):
 
@@ -159,16 +173,17 @@ class Acgan():
             # The labels of the digits that the generator tries to create an
             # image representation of
             sampled_labels = np.random.randint(0, self.num_classes, (batch_size, 1))
-
+            label_tensor = self.get_label_tensor(sampled_labels, batch_size)
             # Generate a half batch of new images
-            gen_imgs = self.generator.predict([noise, sampled_labels])            
+            gen_imgs = self.generator.predict([noise, sampled_labels,label_tensor])            
             # Replay:
             if replay:
                 if epoch> 100 and epoch % 10:
                     self.gen_history.append(gen_imgs[0])
                     self.label_history.append(sampled_labels[0])
                 if epoch> 200: 
-                    gen_imgs, sampled_labels = self.add_replays(gen_imgs, sampled_labels)     
+                    gen_imgs, sampled_labels = self.add_replays(gen_imgs, sampled_labels)
+                    label_tensor = self.get_label_tensor(sampled_labels, batch_size)
                     
                     
             # Image labels. 0-9 
@@ -184,7 +199,7 @@ class Acgan():
             # ---------------------
 
             # Train the generator
-            g_loss = self.combined.train_on_batch([noise, sampled_labels], [valid, sampled_labels])
+            g_loss = self.combined.train_on_batch([noise, sampled_labels, label_tensor], [valid, sampled_labels])
 
             # Plot the progress
             print ("%d [D loss: %f, acc.: %.2f%%, op_acc: %.2f%%] [G loss: %f]" % (epoch, d_loss[0], 100*d_loss[3], 100*d_loss[4], g_loss[0]))
@@ -192,13 +207,14 @@ class Acgan():
             # If at save interval => save generated image samples
             if epoch % sample_interval == 0:
                 self.save_model()
-                self.sample_images(epoch)
+                self.sample_images(epoch, batch_size)
 
-    def sample_images(self, epoch, class_img = 0):
+    def sample_images(self, epoch, batch_size, class_img = 0):  #TODO: Change 4 batch
 
         noise = np.random.normal(0, 1, (1, 100))
         sampled_labels = np.array([class_img])
-        gen_imgs = self.generator.predict([noise, sampled_labels])
+        label_tensor = self.get_label_tensor(sampled_labels, 1)
+        gen_imgs = self.generator.predict([noise, sampled_labels, label_tensor])
 
         # Rescale image to 0 - 255
         gen_imgs = 255 * (0.5 * gen_imgs + 0.5) 
@@ -244,3 +260,13 @@ class Acgan():
             sampled_labels[i_g] = self.label_history[i_h] 
         
         return gen_imgs, sampled_labels
+    
+    
+    def get_label_tensor(self, label, batch_size):
+        shape =(batch_size, int(self.img_size/2), int(self.img_size/2), self.num_classes)
+        t = np.zeros(shape= shape, dtype='float32')
+        for i in range(batch_size):
+            idx = int( label[i])
+            t[i,:,:,idx] = 1
+
+        return t
