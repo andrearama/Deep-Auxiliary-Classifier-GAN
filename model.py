@@ -82,7 +82,7 @@ class Acgan():
                           input_shape=(4*d1, 4*d1, 256+self.num_classes) ))           
         model2.add(LeakyReLU(alpha=0.2))                            
         model2.add(BatchNormalization(momentum=0.8))
-        model.add(UpSampling2D(interpolation='bilinear'))               #size: (img_size,img_size,128)
+        model2.add(UpSampling2D(interpolation='bilinear'))               #size: (img_size,img_size,128)
         model2.add(Conv2D(64, kernel_size=3, padding="same"))            #size: (img_size,img_size,64)
         model2.add(LeakyReLU(alpha=0.2))
         model2.add(BatchNormalization(momentum=0.8))
