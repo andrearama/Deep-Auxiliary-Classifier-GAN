@@ -3,6 +3,11 @@ High quality image generation with a modified version of Auxiliary Classifier GA
 
 The work is an expansion of the AC-GAN architecture introduced in the paper "Conditional Image Synthesis With Auxiliary Classifier GANs" (https://arxiv.org/pdf/1610.09585.pdf).
 While in this paper the images are generated are 64x64 or 128x128, the aim of this implementation is to generate bigger images, namely 300x300.
+## Curent differences with standard AC-GAN:
+- Generator has an additional block formed by 'deconvolutional' (i.e. transposed convolutional) layer, Activation, Batch regularization.
+- The label information is added in the Generator also after the first (just described) block. 
+- Added Label smoothing for Discriminator https://arxiv.org/pdf/1606.03498.pdf
+- Train the discriminator with a batch with also samples taken from a history of generated images https://arxiv.org/pdf/1612.07828.pdf (thus not only created by the current generator)
 
 ## Getting Started
 ### Installation
