@@ -147,10 +147,12 @@ class Acgan():
 
         return Model(img, [validity, label])
 
-    def train(self, epochs, replay = True, batch_size=128, sample_interval=50):
+    def train(self, epochs, batch_size, flip_img, roteate_img,
+              replay = True, sample_interval=50):
 
         # Load the dataset
-        X_train, y_train,number_of_classes = load_dataset(self.img_size,self.create_new)
+        X_train, y_train,number_of_classes = load_dataset(self.img_size, self.create_new, 
+                                                          flip_img, roteate_img)
 
         #Check the number of classes is right
         if number_of_classes != self.num_classes: 

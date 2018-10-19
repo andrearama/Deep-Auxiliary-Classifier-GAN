@@ -12,7 +12,7 @@ import numpy as np
 import pickle
 import os.path
 
-def load_dataset(image_size, create_new):
+def load_dataset(image_size, create_new, flip_img, roteate_img):
     c1 = os.path.isfile("saved_dataset/X_train.pickle")
     c2 = os.path.isfile("saved_dataset/y_train.pickle")
     
@@ -27,14 +27,14 @@ def load_dataset(image_size, create_new):
         number_of_classes = max(y)[0] +1
         print("Dataset loaded successfully")
     else:
-        X, y, number_of_classes = create_dataset(image_size)
+        X, y, number_of_classes = create_dataset(image_size, flip_img, roteate_img)
         
     return X, y, number_of_classes
     
     
     
     
-def create_dataset(image_size):    
+def create_dataset(image_size, flip_img, roteate_img):    
         """
         Create the dataset in the required format.
         It assumes that the images are devided per class in subfolders inside the 
@@ -58,7 +58,8 @@ def create_dataset(image_size):
                 image_list = glob.glob(folder_name+"/*")     
                 # Parse through each image in the current folder:
                 for image_name in image_list:
-                    X, y = add_image(X, y, image_name, image_size, folder_counter)
+                    X, y = add_image(X, y, image_name, image_size, 
+                                     folder_counter, roteate_img, flip_img)
                     
 
         #Normalize and format the data:
@@ -121,3 +122,8 @@ def add_image(X, y, image_name, image_size, folder_counter,
         print("Could not load ",image_name,"Is it an image?")    
         
     return X, y
+
+    
+    
+    
+    
