@@ -58,13 +58,8 @@ def create_dataset(image_size):
                 image_list = glob.glob(folder_name+"/*")     
                 # Parse through each image in the current folder:
                 for image_name in image_list:
-                    img = cv2.imread(image_name)
-                    if img is not None:
-                        img = cv2.resize(img, (image_size, image_size), interpolation = cv2.INTER_AREA)
-                        X.append(img.astype(np.float32))
-                        y.append(np.uint8(folder_counter))               
-                    else:
-                        print("Could not load ",image_name,"Is it an image?")
+                    X, y = add_image(X, y, image_name, image_size, folder_counter)
+                    
 
         #Normalize and format the data:
         X = np.array(X)
@@ -92,3 +87,37 @@ def create_dataset(image_size):
               Total number of samples: """+str(X.shape[0]) )
         
         return X, y, number_of_classes
+    
+    
+def add_image(X, y, image_name, image_size, folder_counter, 
+              roteate = False, mirror = False):
+
+    img = cv2.imread(image_name)
+    if img is not None:
+        img = cv2.resize(img, (image_size, image_size), interpolation = cv2.INTER_AREA)
+        X.append(img.astype(np.float32))
+        y.append(np.uint8(folder_counter))         
+
+        # Roteate 90-180-270 degrees:
+        if roteate:
+            for i in range(3):
+                img = np.rot90(img)
+                X.append(img.astype(np.float32))
+                y.append(np.uint8(folder_counter)) 
+            #restore image to original orientation                
+            img = np.rot90(img) 
+        
+        # Mirror horizontal and vertical
+        if mirror:
+            img_hor = cv2.flip( img, 0 )
+            X.append(img_hor.astype(np.float32))
+            y.append(np.uint8(folder_counter)) 
+
+            img_ver = cv2.flip( img, 1 )
+            X.append(img_ver.astype(np.float32))
+            y.append(np.uint8(folder_counter)) 
+            
+    else:
+        print("Could not load ",image_name,"Is it an image?")    
+        
+    return X, y
