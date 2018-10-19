@@ -8,6 +8,7 @@ While in this paper the images are generated are 64x64 or 128x128, the aim of th
 - The label information is added in the Generator also after the first (just described) block. 
 - Added Label smoothing for Discriminator https://arxiv.org/pdf/1606.03498.pdf
 - Train the discriminator with a batch with also samples taken from a history of generated images https://arxiv.org/pdf/1612.07828.pdf (thus not only created by the current generator)
+- Bilinear interpolation upsampling + normal convolutional layer instead of transposed convolutional https://distill.pub/2016/deconv-checkerboard/
 
 ## Getting Started
 ### Installation
@@ -28,5 +29,5 @@ Just run the train script. It is possible to change the default standards (look 
 python train.py 
 ```
 ### Sources:
-https://github.com/andrearama/Keras-GAN
-https://github.com/soumith/ganhacks
+- https://github.com/andrearama/Keras-GAN
+- https://github.com/soumith/ganhacks
